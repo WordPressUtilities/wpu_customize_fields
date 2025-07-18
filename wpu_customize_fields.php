@@ -4,7 +4,7 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.1
+Version: 0.0.2
 Author: kevinrocher
 Author URI: https://kevinrocher.me/
 Text Domain: wpu_customize_fields
@@ -20,13 +20,23 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.1.0';
+    private $plugin_version = '0.0.2';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
     );
     private $basetoolbox;
     private $plugin_description;
+
+    private $default_fonts = array(
+        array(
+            'Helvetica, Arial, sans-serif' => 'Helvetica, Arial, sans-serif',
+            'Georgia, serif' => 'Georgia, serif',
+            'Courier New, monospace' => 'Courier New, monospace',
+            'Times New Roman, serif' => 'Times New Roman, serif',
+            'Verdana, sans-serif' => 'Verdana, sans-serif'
+        )
+    );
 
     public function __construct() {
         add_action('init', array(&$this, 'load_translation'));
@@ -75,7 +85,6 @@ class WPUCustomizeFields {
         foreach ($fields as $field_id => $field) {
             $this->add_field($wp_customize, $field_id, $field);
         }
-
     }
 
     function add_section($wp_customize, $section_id, $section) {
@@ -116,6 +125,17 @@ class WPUCustomizeFields {
             'settings' => $field_id
         );
 
+        /* Default values */
+        if (!isset($field['choices']) || !is_array($field['choices'])) {
+            $field['choices'] = array();
+        }
+
+        if ($field['type'] == 'font-family' && empty($field['choices'])) {
+            $field['choices'] = $this->default_fonts;
+        }
+
+
+        /* BUILD FIELDS */
         switch ($field['type']) {
         case 'color':
             $default_setting['sanitize_callback'] = 'sanitize_hex_color';
@@ -123,22 +143,24 @@ class WPUCustomizeFields {
             $wp_customize->add_control(new WP_Customize_Color_Control($wp_customize, $field_id, $default_control));
             break;
 
+        case 'select':
         case 'font-family':
-            $default_setting['sanitize_callback'] = 'sanitize_text_field';
-            $wp_customize->add_setting($field_id, $default_setting);
-            $default_control['type'] = 'select';
-            if (!isset($field['choices']) || !is_array($field['choices'])) {
-                $field['choices'] = array(
-                    'Helvetica, Arial, sans-serif' => __('Helvetica, Arial, sans-serif', 'wpu_customize_fields'),
-                    'Georgia, serif' => __('Georgia, serif', 'wpu_customize_fields'),
-                    'Courier New, monospace' => __('Courier New, monospace', 'wpu_customize_fields'),
-                    'Times New Roman, serif' => __('Times New Roman, serif', 'wpu_customize_fields'),
-                    'Verdana, sans-serif' => __('Verdana, sans-serif', 'wpu_customize_fields')
-                );
+            if (empty($field['choices'])) {
+                $field['choices'] = $this->default_fonts;
             }
+            $default_setting['sanitize_callback'] = function ($value) use ($field) {
+                if (array_key_exists($value, $field['choices'])) {
+                    return $value;
+                }
+                return array_key_first($field['choices']);
+            };
+            $wp_customize->add_setting($field_id, $default_setting);
+
+            $default_control['type'] = 'select';
             $default_control['choices'] = $field['choices'];
             $wp_customize->add_control($field_id, $default_control);
             break;
+
         case 'size':
             $default_setting['sanitize_callback'] = function ($value) {
                 return is_numeric($value) ? $value : 0;
@@ -154,6 +176,7 @@ class WPUCustomizeFields {
             $default_control['input_attrs'] = $field['input_attrs'];
             $wp_customize->add_control($field_id, $default_control);
             break;
+
         case 'font-size':
             $default_setting['sanitize_callback'] = function ($value) {
                 return is_numeric($value) ? $value : 16;
