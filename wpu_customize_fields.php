@@ -4,7 +4,7 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.2
+Version: 0.0.3
 Author: kevinrocher
 Author URI: https://kevinrocher.me/
 Text Domain: wpu_customize_fields
@@ -20,7 +20,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.0.2';
+    private $plugin_version = '0.0.3';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
@@ -43,6 +43,7 @@ class WPUCustomizeFields {
         add_action('init', array(&$this, 'init'));
         add_action('customize_register', array(&$this, 'customize_register'));
         add_action('wp_head', array(&$this, 'display_variables'));
+        add_action('admin_head', array(&$this, 'display_variables'));
     }
 
     public function load_translation() {
@@ -110,7 +111,8 @@ class WPUCustomizeFields {
             'label' => $field_id,
             'type' => 'text',
             'section' => 'wpu_customize_fields__default_section',
-            'default' => ''
+            'default' => '',
+            'input_attrs' => array()
         ), $field);
 
         $default_setting = array(
@@ -134,7 +136,6 @@ class WPUCustomizeFields {
             $field['choices'] = $this->default_fonts;
         }
 
-
         /* BUILD FIELDS */
         switch ($field['type']) {
         case 'color':
@@ -155,50 +156,57 @@ class WPUCustomizeFields {
                 return array_key_first($field['choices']);
             };
             $wp_customize->add_setting($field_id, $default_setting);
-
             $default_control['type'] = 'select';
             $default_control['choices'] = $field['choices'];
             $wp_customize->add_control($field_id, $default_control);
             break;
 
         case 'size':
-            $default_setting['sanitize_callback'] = function ($value) {
-                return is_numeric($value) ? $value : 0;
-            };
-            $wp_customize->add_setting($field_id, $default_setting);
-            $default_control['type'] = 'number';
-            if (!isset($field['input_attrs']) || !is_array($field['input_attrs'])) {
-                $field['input_attrs'] = array(
-                    'min' => 0,
-                    'step' => 1
-                );
-            }
-            $default_control['input_attrs'] = $field['input_attrs'];
-            $wp_customize->add_control($field_id, $default_control);
-            break;
-
         case 'font-size':
-            $default_setting['sanitize_callback'] = function ($value) {
-                return is_numeric($value) ? $value : 16;
+
+            /* Set default value */
+            $_default = ($field['type'] === 'size') ? 0 : 16;
+            if (!isset($field['default']) || !is_numeric($field['default'])) {
+                $field['default'] = $_default;
+            }
+
+            /* Set input attributes */
+            $input_attrs = array(
+                'min' => 0,
+                'max' => 1000,
+                'step' => 1
+            );
+            if ($field['type'] === 'font-size') {
+                $input_attrs['min'] = 12;
+                $input_attrs['max'] = 200;
+                $input_attrs['default'] = 16;
+            }
+            if (!is_array($field['input_attrs'])) {
+                $field['input_attrs'] = $input_attrs;
+            }
+            foreach ($input_attrs as $key => $value) {
+                if (!isset($field['input_attrs'][$key]) || !is_numeric($field['input_attrs'][$key])) {
+                    $field['input_attrs'][$key] = $value;
+                }
+            }
+            $default_setting['sanitize_callback'] = function ($value) use ($field) {
+                if (!is_numeric($value) || $value < $field['input_attrs']['min'] || $value > $field['input_attrs']['max']) {
+                    $value = $field['default'];
+                }
+                return $value;
             };
             $wp_customize->add_setting($field_id, $default_setting);
             $default_control['type'] = 'number';
-            if (!isset($field['input_attrs']) || !is_array($field['input_attrs'])) {
-                $field['input_attrs'] = array(
-                    'min' => 12,
-                    'step' => 1
-                );
-            }
             $default_control['input_attrs'] = $field['input_attrs'];
             $wp_customize->add_control($field_id, $default_control);
             break;
-
         default:
             $wp_customize->add_setting($field_id, $default_setting);
             $default_control['type'] = 'text';
             $wp_customize->add_control($field_id, $default_control);
             break;
         }
+
     }
 
     function display_variables() {
@@ -228,6 +236,7 @@ class WPUCustomizeFields {
         }
 
     }
+
 }
 
 $WPUCustomizeFields = new WPUCustomizeFields();
