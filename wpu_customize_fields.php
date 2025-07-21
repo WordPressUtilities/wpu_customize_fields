@@ -4,13 +4,14 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.3
+Version: 0.0.4
 Author: kevinrocher
 Author URI: https://kevinrocher.me/
 Text Domain: wpu_customize_fields
 Domain Path: /lang
 Requires at least: 6.2
 Requires PHP: 8.0
+Network: Optional
 License: MIT License
 License URI: https://opensource.org/licenses/MIT
 */
@@ -20,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.0.3';
+    private $plugin_version = '0.0.4';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
@@ -40,10 +41,17 @@ class WPUCustomizeFields {
 
     public function __construct() {
         add_action('init', array(&$this, 'load_translation'));
-        add_action('init', array(&$this, 'init'));
+        add_action('init', array(&$this, 'load_dependencies'));
         add_action('customize_register', array(&$this, 'customize_register'));
         add_action('wp_head', array(&$this, 'display_variables'));
         add_action('admin_head', array(&$this, 'display_variables'));
+        add_action('customize_preview_init', function () {
+            wp_enqueue_script('wpu-customize-fields-preview-vars', plugins_url('assets/customize-preview.js', __FILE__), ['customize-preview', 'jquery'], null, true);
+            wp_localize_script('wpu-customize-fields-preview-vars', 'WPUCustomizeFields', array(
+                'fields' => $this->get_fields()
+            ));
+        });
+
     }
 
     public function load_translation() {
@@ -56,18 +64,19 @@ class WPUCustomizeFields {
         $this->plugin_description = __('Custom fields for WP Customizer', 'wpu_customize_fields');
     }
 
-    public function init() {
+    public function load_dependencies() {
 
         # Load TOOLBOX
         require_once __DIR__ . '/inc/WPUBaseToolbox/WPUBaseToolbox.php';
         $this->basetoolbox = new \wpu_customize_fields\WPUBaseToolbox(array(
             'need_form_js' => false
         ));
+
     }
 
-    function customize_register($wp_customize) {
+    public function customize_register($wp_customize) {
         $sections = apply_filters('wpu_customize_fields__sections', array());
-        $fields = apply_filters('wpu_customize_fields__fields', array());
+        $fields = $this->get_fields();
 
         if (empty($sections) && empty($fields)) {
             return;
@@ -88,7 +97,7 @@ class WPUCustomizeFields {
         }
     }
 
-    function add_section($wp_customize, $section_id, $section) {
+    public function add_section($wp_customize, $section_id, $section) {
         if (!is_array($section) || !isset($section['title']) || empty($section['title'])) {
             $section = array(
                 'title' => $section_id
@@ -101,7 +110,7 @@ class WPUCustomizeFields {
         ));
     }
 
-    function add_field($wp_customize, $field_id, $field = array()) {
+    public function add_field($wp_customize, $field_id, $field = array()) {
 
         if (!is_array($field)) {
             return;
@@ -118,7 +127,7 @@ class WPUCustomizeFields {
         $default_setting = array(
             'default' => $field['default'],
             'sanitize_callback' => 'sanitize_text_field',
-            'transport' => 'refresh'
+            'transport' => 'postMessage'
         );
 
         $default_control = array(
@@ -209,10 +218,10 @@ class WPUCustomizeFields {
 
     }
 
-    function display_variables() {
+    public function display_variables() {
 
         $values_html = '';
-        $fields = apply_filters('wpu_customize_fields__fields', array());
+        $fields = $this->get_fields();
         foreach ($fields as $field_id => $field) {
             if (isset($field['default'])) {
                 $value = get_theme_mod($field_id, $field['default']);
@@ -235,6 +244,27 @@ class WPUCustomizeFields {
             echo '<style>:root { ' . $values_html . '}</style>';
         }
 
+    }
+
+    public function get_fields() {
+        $fields = apply_filters('wpu_customize_fields__fields', array());
+        if (empty($fields) || !is_array($fields)) {
+            return array();
+        }
+
+        foreach ($fields as $field_id => $field) {
+            if (!isset($field['id'])) {
+                $fields[$field_id]['id'] = $field_id;
+            }
+            if (!isset($field['label'])) {
+                $fields[$field_id]['label'] = $field_id;
+            }
+            if (!isset($field['type'])) {
+                $fields[$field_id]['type'] = 'text';
+            }
+        }
+
+        return $fields;
     }
 
 }
