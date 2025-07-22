@@ -4,7 +4,7 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.4
+Version: 0.0.5
 Author: kevinrocher
 Author URI: https://kevinrocher.me/
 Text Domain: wpu_customize_fields
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.0.4';
+    private $plugin_version = '0.0.5';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
@@ -116,18 +116,12 @@ class WPUCustomizeFields {
             return;
         }
 
-        $field = array_merge(array(
-            'label' => $field_id,
-            'type' => 'text',
-            'section' => 'wpu_customize_fields__default_section',
-            'default' => '',
-            'input_attrs' => array()
-        ), $field);
+        $field = $this->get_field($field_id, $field);
 
         $default_setting = array(
             'default' => $field['default'],
             'sanitize_callback' => 'sanitize_text_field',
-            'transport' => 'postMessage'
+            'transport' => $field['transport']
         );
 
         $default_control = array(
@@ -136,21 +130,19 @@ class WPUCustomizeFields {
             'settings' => $field_id
         );
 
-        /* Default values */
-        if (!isset($field['choices']) || !is_array($field['choices'])) {
-            $field['choices'] = array();
-        }
-
-        if ($field['type'] == 'font-family' && empty($field['choices'])) {
-            $field['choices'] = $this->default_fonts;
-        }
-
         /* BUILD FIELDS */
         switch ($field['type']) {
         case 'color':
             $default_setting['sanitize_callback'] = 'sanitize_hex_color';
             $wp_customize->add_setting($field_id, $default_setting);
             $wp_customize->add_control(new WP_Customize_Color_Control($wp_customize, $field_id, $default_control));
+            break;
+
+        case 'image':
+            $default_setting['sanitize_callback'] = 'esc_url_raw';
+            $wp_customize->add_setting($field_id, $default_setting);
+            $default_control['type'] = 'image';
+            $wp_customize->add_control(new WP_Customize_Image_Control($wp_customize, $field_id, $default_control));
             break;
 
         case 'select':
@@ -223,6 +215,11 @@ class WPUCustomizeFields {
         $values_html = '';
         $fields = $this->get_fields();
         foreach ($fields as $field_id => $field) {
+
+            if (!isset($field['is_css_var']) || !$field['is_css_var']) {
+                continue; // Skip if not a CSS variable
+            }
+
             if (isset($field['default'])) {
                 $value = get_theme_mod($field_id, $field['default']);
             } else {
@@ -236,12 +233,12 @@ class WPUCustomizeFields {
             }
 
             if ($value) {
-                $values_html .= '--wpucustomizefields-' . esc_html($field_id) . ': ' . esc_html($value) . ';' . "\n";
+                $values_html .= '--wpucustomizefields-' . esc_html($field_id) . ':' . esc_html($value) . ';';
             }
         }
 
         if ($values_html) {
-            echo '<style>:root { ' . $values_html . '}</style>';
+            echo '<style>:root{' . $values_html . '}</style>';
         }
 
     }
@@ -253,18 +250,34 @@ class WPUCustomizeFields {
         }
 
         foreach ($fields as $field_id => $field) {
-            if (!isset($field['id'])) {
-                $fields[$field_id]['id'] = $field_id;
-            }
-            if (!isset($field['label'])) {
-                $fields[$field_id]['label'] = $field_id;
-            }
-            if (!isset($field['type'])) {
-                $fields[$field_id]['type'] = 'text';
-            }
+            $fields[$field_id] = $this->get_field($field_id, $field);
         }
 
         return $fields;
+    }
+
+    public function get_field($field_id, $field) {
+        $field = array_merge(array(
+            'label' => $field_id,
+            'id' => $field_id,
+            'type' => 'text',
+            'is_css_var' => true,
+            'section' => 'wpu_customize_fields__default_section',
+            'default' => '',
+            'transport' => 'postMessage',
+            'input_attrs' => array()
+        ), $field);
+
+        /* Default values */
+        if (!isset($field['choices']) || !is_array($field['choices'])) {
+            $field['choices'] = array();
+        }
+
+        if ($field['type'] == 'font-family' && empty($field['choices'])) {
+            $field['choices'] = $this->default_fonts;
+        }
+
+        return $field;
     }
 
 }
