@@ -4,9 +4,9 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.5
-Author: kevinrocher
-Author URI: https://kevinrocher.me/
+Version: 0.0.6
+Author: Darklg
+Author URI: https://darklg.me/
 Text Domain: wpu_customize_fields
 Domain Path: /lang
 Requires at least: 6.2
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.0.5';
+    private $plugin_version = '0.0.6';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
@@ -89,6 +89,9 @@ class WPUCustomizeFields {
                 )
             );
         }
+
+        require_once __DIR__ . '/inc/class-custom-heading-control.php';
+
         foreach ($sections as $section_id => $section) {
             $this->add_section($wp_customize, $section_id, $section);
         }
@@ -201,6 +204,14 @@ class WPUCustomizeFields {
             $default_control['input_attrs'] = $field['input_attrs'];
             $wp_customize->add_control($field_id, $default_control);
             break;
+        case 'title':
+            $wp_customize->add_control(new WPUCustomizeFields_HeadingControl($wp_customize, $field_id, [
+                'label' => $field['label'],
+                'section' => $field['section'],
+                'settings' => []
+            ]));
+
+            break;
         default:
             $wp_customize->add_setting($field_id, $default_setting);
             $default_control['type'] = 'text';
@@ -275,6 +286,11 @@ class WPUCustomizeFields {
 
         if ($field['type'] == 'font-family' && empty($field['choices'])) {
             $field['choices'] = $this->default_fonts;
+        }
+
+        if ($field['type'] == 'title') {
+            $field['transport'] = 'refresh';
+            $field['is_css_var'] = false;
         }
 
         return $field;
