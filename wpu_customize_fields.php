@@ -4,7 +4,7 @@ Plugin Name: WPU Customize Fields
 Plugin URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Update URI: https://github.com/WordPressUtilities/wpu_customize_fields
 Description: Custom fields for WP Customizer
-Version: 0.0.6
+Version: 0.0.7
 Author: Darklg
 Author URI: https://darklg.me/
 Text Domain: wpu_customize_fields
@@ -21,7 +21,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WPUCustomizeFields {
-    private $plugin_version = '0.0.6';
+    private $plugin_version = '0.0.7';
     private $plugin_settings = array(
         'id' => 'wpu_customize_fields',
         'name' => 'WPU Customize Fields'
@@ -241,6 +241,10 @@ class WPUCustomizeFields {
 
             if ($field['type'] === 'font-size' || $field['type'] === 'size') {
                 $value .= 'px';
+            }
+
+            if ($value && isset($field['is_css_url']) && $field['is_css_url']) {
+                $value = 'url(' . $value . ')';
             }
 
             if ($value) {
